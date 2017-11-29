@@ -50,9 +50,10 @@
 // 125k max sampling
 // SS2 triggering event: software trigger, busy-wait sampling
 // SS2 1st sample source: AIN2 (PE1)
-// SS2 2nd sample source: AIN0 (PE3)
 // SS2 2nd sample source: AIN9 (PE4)
 // SS2 3rd sample source: AIN8 (PE5)
+// SS2 4th sample source: AIN1 (PE2)
+
 // SS2 interrupts: enabled after 3rd sample but not promoted to controller
 void ADC_Init2981(void){
   volatile unsigned long delay;
@@ -86,7 +87,7 @@ void ADC_Init2981(void){
 // 125k max sampling
 // software trigger, busy-wait sampling
 // data returned by reference
-// ain0 (PE3) 0 to 4095
+// ain1 (PE2) 0 to 4095
 // ain2 (PE1) 0 to 4095
 // ain9 (PE4) 0 to 4095
 // ain8 (PE5) 0 to 4095
