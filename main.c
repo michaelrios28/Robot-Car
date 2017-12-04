@@ -24,6 +24,8 @@
     unsigned short distanceLeft; 
     unsigned short distanceMiddle; 
     unsigned short distanceRight; 
+    
+    
     // --------------------------Median--------------------------------
     // 
     //      Helper function for ReadADCMedianFilter()
@@ -45,6 +47,8 @@
             else      result=u3;   // u2>u1,u2>u3,u3>u1 u2>u3>u1
       return(result);
     }
+    
+    
     // ------------------------Median Filter--------------------------
     // 
     // This function samples AIN2 (PE1), AIN9 (PE4), AIN8 (PE5) and
@@ -76,6 +80,8 @@
       ain2oldest = ain2middle; ain9oldest = ain9middle; ain8oldest = ain8middle, ain1oldest = ain1middle;
       ain2middle = ain2newest; ain9middle = ain9newest; ain8middle = ain8newest, ain1middle = ain1newest;
     }
+    
+    
     // ---------Systick Periodic Interrupt Initialization---------
     // 
     //      Interrupt Service Routine
@@ -92,6 +98,8 @@
         NVIC_ST_CTRL_R = 0x07;
         EnableInterrupts();
     }
+    
+    
     // --------------Systick Periodic Interrupt Handler--------------
     // 
     //      Interrupt service routine
@@ -100,10 +108,9 @@
     // 
     // --------------------------------------------------------------
     void SysTick_Handler(void){
-        
         ReadADCMedianFilter(&ain2, &ain9, &ain8, &ain1); 
-        
     }
+    
     
     // ---------------------Initialize PortC---------------------------
     // 
@@ -123,17 +130,70 @@
         GPIO_PORTC_AFSEL_R = 0x00;        // 5) no alternate function
         GPIO_PORTC_DEN_R = 0x30;          // 6) enable digital pins PC4 & PC5       
     }
-
+    
+    // ---------------------Initialize PortF---------------------------
+    // 
+    //          PF4 - onboard button used to 
+    //          turn system on and off
+    //          Inputs: PF4 
+    //          Outputs: none
+    // 
+    // ----------------------------------------------------------------
+    void PortF_Init(void){ volatile unsigned long delay;
+        SYSCTL_RCGC2_R |= 0x00000020; // (a) activate clock for port F
+        GPIO_PORTF_DIR_R &= ~0x10;    // (c) make PF4 in (built-in button)
+        GPIO_PORTF_AFSEL_R &= ~0x10;  //     disable alt funct on PF4
+        GPIO_PORTF_DEN_R |= 0x10;     //     enable digital I/O on PF4   
+        GPIO_PORTF_PCTL_R &= ~0x000F0000; // configure PF4 as GPIO
+        GPIO_PORTF_AMSEL_R = 0;       //     disable analog functionality on PF
+        GPIO_PORTF_PUR_R |= 0x10;     //     enable weak pull-up on PF4
+        GPIO_PORTF_IS_R &= ~0x10;     // (d) PF4 is edge-sensitive
+        GPIO_PORTF_IBE_R &= ~0x10;    //     PF4 is not both edges
+        GPIO_PORTF_IEV_R &= ~0x10;    //     PF4 falling edge event
+        GPIO_PORTF_ICR_R = 0x10;      // (e) clear flag4
+        GPIO_PORTF_IM_R |= 0x10;      // (f) arm interrupt on PF4
+        NVIC_PRI7_R = (NVIC_PRI7_R&0xFF00FFFF)|0x00A00000; // (g) priority 5
+        NVIC_EN0_R = 0x40000000;      // (h) enable interrupt 30 in NVIC
+        EnableInterrupts();           // (i) Clears the I bit  
+    }
+    // ---------------------PortF ISR---------------------------
+    // 
+    //          PF4 - onboard button used to 
+    //          turn system on and off
+    //          Inputs: PF4 
+    //          Outputs: none
+    // 
+    // ---------------------------------------------------------
+    unsigned char flag = 0;
+    void GPIOPortF_Handler(void){
+        if (GPIO_PORTF_RIS_R & 0x10) {
+            GPIO_PORTF_ICR_R = 0x10;      // acknowledge flag4
+            flag +=1;
+            if (flag % 2 ==1) {
+            // update PWM duty cycle according to the potentiometer
+            PWM0L_Duty(ain1 * (9.767765568));
+            PWM0R_Duty(ain1 * (9.767765568));
+            }   
+            else if (flag % 2 ==0) {
+            PWM0L_Duty(0);
+            PWM0R_Duty(0);
+            }
+  
+        }   
+    }
+  
+    
     int main(void){
         PLL_Init();            // speed the clock to 80 MHz
         Nokia5110_Init();      // initialize the Nokia LCD Screen 
         Nokia5110_Clear();
         PortC_Init();          // initialize PortC for purpose of driving motors
+        PortF_Init();          // initialize PortC for purpose of driving motors
         ADC_Init2981();        // initialize ADC to sample AIN2 (PE1), AIN9 (PE4), AIN8 (PE5), AIN1 (PE2)
         ReadADCMedianFilter(&ain2, &ain9, &ain8, &ain1); 
         LCDduty = ain1 * (9.767765568); 
-        PWM0L_Init(40000, LCDduty);          // initialize left motor's PWM
-        PWM0R_Init(40000, LCDduty);          // initialize right motor's PWM
+        PWM0L_Init(40000, 0);          // initialize left motor's PWM
+        PWM0R_Init(40000, 0);          // initialize right motor's PWM
         SysTick_Init(1999999);   // initialize SysTick timer with corresponding 40Hz period 
 
         // TODO: sample the sensors outside of the loop 
@@ -151,34 +211,41 @@
             distanceRight  = (35387.43760/ain2)  + 0.484435200; 
             
             // update PWM duty cycle according to the potentiometer
-            PWM0L_Duty(ain1 * (9.767765568));
-            PWM0R_Duty(ain1 * (9.767765568));
+            //PWM0L_Duty(ain1 * (9.767765568));
+            //PWM0R_Duty(ain1 * (9.767765568));
             
-            if (distanceMiddle <= 20){
-                PWM0L_Duty(0);
-                PWM0R_Duty(0);
-            }
-            if ((distanceRight >= 40 && distanceMiddle <= 40) || (distanceLeft <= 40)) {
-                // Turns right 
-                PWM0L_Duty(ain1 * (9.767765568));
-                PWM0R_Duty((ain1 * (9.767765568) * .7));
-            }
-            if ((distanceLeft >= 40 && distanceMiddle <= 40) || (distanceRight <=40)) { 
-                // Turns left 
-                PWM0L_Duty((ain1 * (9.767765568) * .7));
-                PWM0R_Duty(ain1 * (9.767765568));
+            
+            //out of range 
+            if (distanceLeft >= 70) { 
+                PWM0L_Duty(ain1 * (9.767765568) * .4);
+                PWM0R_Duty(ain1 * (9.767765568) * .8);
             }
             
-            if (distanceRight <= 40 && distanceMiddle <=40 && distanceLeft >= 40 ) {
-                // Turns left 
-                PWM0L_Duty(0);
+            //out of range 
+            else if (distanceRight >= 70) { 
+                PWM0L_Duty(ain1 * (9.767765568) * .8);
+                PWM0R_Duty(ain1 * (9.767765568) * .4);
+            }
+             
+            else if (distanceMiddle >=70) {
+                PWM0L_Duty(ain1 * (9.767765568));
                 PWM0R_Duty(ain1 * (9.767765568));
             }
-            if (distanceLeft <= 40 && distanceMiddle <=40 && distanceRight >= 40 ) {
-                // Turns right 
-                PWM0L_Duty(ain1 * (9.767765568));
-                PWM0R_Duty(0);
+           
+            else if (distanceLeft <= 50 ) {
+                PWM0L_Duty(ain1 * (9.767765568) * .9);
+                PWM0R_Duty(ain1 * (9.767765568) * .7);
+                
+            } 
+            else if (distanceRight <= 50) { 
+                PWM0L_Duty(ain1 * (9.767765568) * .7);
+                PWM0R_Duty(ain1 * (9.767765568) * .9);
             }
+            else 
+                PWM0L_Duty(0);
+                PWM0R_Duty(0);
+            
+
             
             // Update LCD 
             Nokia5110_SetCursor(0, 0);
