@@ -166,20 +166,8 @@
     // ---------------------------------------------------------
     unsigned char flag = 0;
     void GPIOPortF_Handler(void){
-        if (GPIO_PORTF_RIS_R & 0x10) {
             GPIO_PORTF_ICR_R = 0x10;      // acknowledge flag4
             flag +=1;
-            if (flag % 2 ==1) {
-            // update PWM duty cycle according to the potentiometer
-            PWM0L_Duty(ain1 * (9.767765568));
-            PWM0R_Duty(ain1 * (9.767765568));
-            }   
-            else if (flag % 2 ==0) {
-            PWM0L_Duty(0);
-            PWM0R_Duty(0);
-            }
-  
-        }   
     }
   
     
@@ -192,17 +180,12 @@
         ADC_Init2981();        // initialize ADC to sample AIN2 (PE1), AIN9 (PE4), AIN8 (PE5), AIN1 (PE2)
         ReadADCMedianFilter(&ain2, &ain9, &ain8, &ain1); 
         LCDduty = ain1 * (9.767765568); 
-        PWM0L_Init(40000, 0);          // initialize left motor's PWM
-        PWM0R_Init(40000, 0);          // initialize right motor's PWM
+        PWM0L_Init(40000, LCDduty);          // initialize left motor's PWM
+        PWM0R_Init(40000, LCDduty);          // initialize right motor's PWM
         SysTick_Init(1999999);   // initialize SysTick timer with corresponding 40Hz period 
 
-        // TODO: sample the sensors outside of the loop 
         while(1){
-            // TODO: 
-            // (1) update LCD
-            // (2) update PWM duty cycle if needed 
-            // (3) start / stop motors 
-            
+
             // Inverse regression formula obtained using data obtained when  
             // calibrating sensors by measuring ADC values at corresponding 
             // distances...
@@ -214,36 +197,51 @@
             //PWM0L_Duty(ain1 * (9.767765568));
             //PWM0R_Duty(ain1 * (9.767765568));
             
-            
-            //out of range 
-            if (distanceLeft >= 70) { 
-                PWM0L_Duty(ain1 * (9.767765568) * .4);
-                PWM0R_Duty(ain1 * (9.767765568) * .8);
-            }
-            
-            //out of range 
-            else if (distanceRight >= 70) { 
-                PWM0L_Duty(ain1 * (9.767765568) * .8);
-                PWM0R_Duty(ain1 * (9.767765568) * .4);
-            }
-             
-            else if (distanceMiddle >=70) {
-                PWM0L_Duty(ain1 * (9.767765568));
-                PWM0R_Duty(ain1 * (9.767765568));
-            }
-           
-            else if (distanceLeft <= 50 ) {
-                PWM0L_Duty(ain1 * (9.767765568) * .9);
-                PWM0R_Duty(ain1 * (9.767765568) * .7);
+            if (flag % 2 == 1) {
+                // out of range 
+                // turn left
+                if (distanceLeft >= 70) { 
+                    PWM0L_Duty(ain1 * (9.767765568) * .3);
+                    PWM0R_Duty(ain1 * (9.767765568) * .8);
+                }
                 
-            } 
-            else if (distanceRight <= 50) { 
-                PWM0L_Duty(ain1 * (9.767765568) * .7);
-                PWM0R_Duty(ain1 * (9.767765568) * .9);
+                // out of range 
+                // turn right 
+                if (distanceRight >= 70) { 
+                    PWM0L_Duty(ain1 * (9.767765568) * .8);
+                    PWM0R_Duty(ain1 * (9.767765568) * .3);
+                }
+                
+                // out of range 
+                // stay middle 
+                if (distanceMiddle >= 70) {
+                    PWM0L_Duty(ain1 * (9.767765568));
+                    PWM0R_Duty(ain1 * (9.767765568));
+                }
+               
+                if (distanceLeft <= 50 ) {
+                    PWM0L_Duty(ain1 * (9.767765568) * .9);
+                    PWM0R_Duty(ain1 * (9.767765568) * .7);
+                    
+                } 
+                if (distanceRight <= 50) { 
+                    PWM0L_Duty(ain1 * (9.767765568) * .7);
+                    PWM0R_Duty(ain1 * (9.767765568) * .9);
+                }
+                
+                // stop at the end of course
+                if (distanceLeft >=65 && distanceRight >= 65 && distanceMiddle >= 65) {
+                    PWM0L_Duty(0);
+                    PWM0R_Duty(0);
+                }
+                
             }
-            else 
+            else if (flag % 2 == 0) 
+            {
                 PWM0L_Duty(0);
                 PWM0R_Duty(0);
+            }
+
             
 
             
