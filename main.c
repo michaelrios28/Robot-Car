@@ -192,10 +192,7 @@
             distanceLeft   = (40492.04680/ain8)  - 5.013417600; 
             distanceMiddle = (56441.51981/ain9)  - 13.39044053; 
             distanceRight  = (35387.43760/ain2)  + 0.484435200; 
-            
-            // update PWM duty cycle according to the potentiometer
-            //PWM0L_Duty(ain1 * (9.767765568));
-            //PWM0R_Duty(ain1 * (9.767765568));
+
             
             if (flag % 2 == 1) {
                 // out of range 
